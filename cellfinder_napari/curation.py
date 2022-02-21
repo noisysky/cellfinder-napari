@@ -52,6 +52,7 @@ class CurationWidget(QWidget):
         self.background_layer = None
         self.training_data_cell_layer = None
         self.training_data_non_cell_layer = None
+        self.training_data_vasculature_layer = None
 
         self.image_layer_names = self._get_layer_names()
         self.point_layer_names = self._get_layer_names(
@@ -79,6 +80,9 @@ class CurationWidget(QWidget):
             )
             self._update_combobox_options(
                 self.training_data_non_cell_choice, self.point_layer_names
+            )
+            self._update_combobox_options(
+                self.training_data_vasculature_choice, self.point_layer_names
             )
 
     @staticmethod
@@ -153,31 +157,42 @@ class CurationWidget(QWidget):
             4,
             callback=self.set_training_data_non_cell,
         )
+        self.training_data_vasculature_choice, _ = add_combobox(
+            self.load_data_layout,
+            "Training_data (vasculature)",
+            self.point_layer_names,
+            5,
+            callback=self.set_training_data_vasculature,
+        )
         self.mark_as_cell_button = add_button(
             "Mark as cell(s)",
             self.load_data_layout,
             self.mark_as_cell,
-            5,
+            6,
         )
         self.mark_as_non_cell_button = add_button(
             "Mark as non cell(s)",
             self.load_data_layout,
             self.mark_as_non_cell,
-            5,
-            column=1,
+            7,
+        )
+        self.mark_as_vasculature_button = add_button(
+            "Mark as vasculature",
+            self.load_data_layout,
+            self.mark_as_vasculature,
+            8,
         )
         self.add_training_data_button = add_button(
             "Add training data layers",
             self.load_data_layout,
             self.add_training_data,
-            6,
+            9,
         )
         self.save_training_data_button = add_button(
             "Save training data",
             self.load_data_layout,
             self.save_training_data,
-            6,
-            column=1,
+            10,
         )
         self.load_data_layout.setColumnMinimumWidth(0, COLUMN_WIDTH)
         self.load_data_panel.setLayout(self.load_data_layout)
@@ -214,14 +229,25 @@ class CurationWidget(QWidget):
             ] = Cell.UNKNOWN
             self.training_data_non_cell_layer.metadata["training_data"] = True
 
+    def set_training_data_vasculature(self):
+        if self.training_data_vasculature_choice.currentText() != "":
+            self.training_data_vasculature_layer = self.viewer.layers[
+                self.training_data_vasculature_choice.currentText()
+            ]
+            self.training_data_vasculature_layer.metadata[
+                "point_type"
+            ] = Cell.VASCULATURE
+            self.training_data_vasculature_layer.metadata["training_data"] = True
+
     def add_training_data(
         self,
     ):
         cell_name = "Training data (cells)"
         non_cell_name = "Training data (non cells)"
+        vasculature_name = "Training data (vasculature)"
 
         overwrite = False
-        if self.training_data_cell_layer or self.training_data_non_cell_layer:
+        if self.training_data_cell_layer or self.training_data_non_cell_layer or self.training_data_vasculature_layer:
             overwrite = display_question(
                 self,
                 "Training data layers exist",
@@ -231,18 +257,19 @@ class CurationWidget(QWidget):
         else:
             if self.training_data_cell_layer:
                 self.training_data_cell_layer.remove()
-            self._add_training_data_layers(cell_name, non_cell_name)
+            self._add_training_data_layers(cell_name, non_cell_name, vasculature_name)
 
         if overwrite:
             try:
                 self.viewer.layers.remove(cell_name)
                 self.viewer.layers.remove(non_cell_name)
+                self.viewer.layers.remove(vasculature_name)
             except ValueError:
                 pass
 
-            self._add_training_data_layers(cell_name, non_cell_name)
+            self._add_training_data_layers(cell_name, non_cell_name, vasculature_name)
 
-    def _add_training_data_layers(self, cell_name, non_cell_name):
+    def _add_training_data_layers(self, cell_name, non_cell_name, vasculature_name):
 
         self.training_data_cell_layer = self.viewer.add_points(
             None,
@@ -270,15 +297,31 @@ class CurationWidget(QWidget):
         )
         self.training_data_non_cell_choice.setCurrentText(non_cell_name)
 
+        self.training_data_vasculature_layer = self.viewer.add_points(
+            None,
+            ndim=3,
+            symbol="ring",
+            n_dimensional=True,
+            size=15,
+            opacity=0.6,
+            face_color="green",
+            name=vasculature_name,
+            metadata=dict(point_type=Cell.VASCULATURE, training_data=True),
+        )
+        self.training_data_vasculature_choice.setCurrentText(vasculature_name)
+
     def mark_as_cell(self):
         self.mark_point_as_type("cell")
 
     def mark_as_non_cell(self):
         self.mark_point_as_type("non-cell")
 
+    def mark_as_vasculature(self):
+        self.mark_point_as_type("vasculature")
+
     def mark_point_as_type(self, point_type):
         if not (
-            self.training_data_cell_layer and self.training_data_non_cell_layer
+            self.training_data_cell_layer and self.training_data_non_cell_layer and self.training_data_vasculature_layer
         ):
             display_info(
                 self,
@@ -295,6 +338,8 @@ class CurationWidget(QWidget):
                 if len(layer.data) > 0:
                     if point_type == "cell":
                         destination_layer = self.training_data_cell_layer
+                    elif point_type == "vasculature":
+                        destination_layer = self.training_data_vasculature_layer
                     else:
                         destination_layer = self.training_data_non_cell_layer
                     print(
@@ -357,6 +402,7 @@ class CurationWidget(QWidget):
         worker = extract_cubes(
             self.cells_to_extract,
             self.non_cells_to_extract,
+            self.vasculature_to_extract,
             self.output_directory,
             self.signal_layer.data,
             self.background_layer.data,
@@ -406,7 +452,7 @@ class CurationWidget(QWidget):
 
     def check_training_data_exists(self):
         if not (
-            self.training_data_cell_layer or self.training_data_non_cell_layer
+            self.training_data_cell_layer or self.training_data_non_cell_layer or self.training_data_vasculature_layer
         ):
             display_info(
                 self,
@@ -419,6 +465,7 @@ class CurationWidget(QWidget):
             if (
                 len(self.training_data_cell_layer.data) > 0
                 or len(self.training_data_non_cell_layer.data) > 0
+                or len(self.training_data_vasculature_layer.data) > 0
             ):
                 return True
             else:

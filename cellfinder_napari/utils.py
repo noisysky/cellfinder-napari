@@ -1,7 +1,7 @@
 import pandas as pd
 from imlib.cells.cells import Cell
 from pkg_resources import resource_filename
-from qtpy.QtWidgets import QComboBox, QLabel, QMessageBox, QPushButton
+from qtpy.QtWidgets import QComboBox, QLabel, QLineEdit, QMessageBox, QPushButton
 
 brainglobe_logo = resource_filename(
     "cellfinder_napari", "images/brainglobe.png"
@@ -78,6 +78,16 @@ def add_button(
     layout.addWidget(button, row, column)
     button.clicked.connect(connected_function)
     return button
+
+
+def add_lineedit(
+    layout,
+    row,
+    column=0
+):
+    lineedit = QLineEdit()
+    layout.addWidget(lineedit, row, column)
+    return lineedit
 
 
 def display_info(widget, title, message):

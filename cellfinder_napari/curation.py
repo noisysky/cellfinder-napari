@@ -11,7 +11,7 @@ from napari.qt.threading import thread_worker
 from qtpy import QtCore
 from qtpy.QtWidgets import QFileDialog, QGridLayout, QGroupBox, QLabel, QWidget
 
-from .utils import add_button, add_combobox, display_info, display_question
+from .utils import add_button, add_combobox, add_lineedit, display_info, display_question
 
 # Constants used throughout
 WINDOW_HEIGHT = 750
@@ -179,6 +179,7 @@ class CurationWidget(QWidget):
             6,
             column=1,
         )
+        self.resolution_field = add_lineedit(layout=self.load_data_layout, row=11)
         self.load_data_layout.setColumnMinimumWidth(0, COLUMN_WIDTH)
         self.load_data_panel.setLayout(self.load_data_layout)
         self.load_data_panel.setVisible(True)
@@ -341,6 +342,8 @@ class CurationWidget(QWidget):
             )
 
     def save_training_data(self):
+        voxel_sizes_str = self.resolution_field.text()
+        self.voxel_sizes = list(map(float, voxel_sizes_str.split(',')))
         if self.is_data_extractable():
             self.get_output_directory()
             if self.output_directory != "":
